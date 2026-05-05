@@ -156,3 +156,89 @@ if "fare_amount" in df.columns:
 
 print("图表已保存到：")
 print(output_folder)
+
+#M3
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+
+# 2. 构造预测目标：区域+时段 出行量
+# 按【区域 + 小时】统计订单量（预测目标）
+df_demand = df.groupby(["PULocationID", "pick_hour"]).size().reset_index(name="demand")
+df_merge = df_demand.merge(df, on=["PULocationID", "pick_hour"], how="left")
+
+# 特征：区域ID、小时、星期、是否周末
+X = df_merge[["PULocationID", "pick_hour", "weekday", "is_weekend"]]
+y = df_merge["demand"]
+
+# 划分训练集 80%，测试集 20%
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 特征标准化
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+#模型1：神经网络（TensorFlow）
+print("\n====== 训练神经网络 ======")
+model_nn = Sequential([
+    Dense(64, activation="relu", input_shape=(X_train_scaled.shape[1],)),
+    Dropout(0.2),
+    Dense(32, activation="relu"),
+    Dense(1)
+])
+model_nn.compile(optimizer="adam", loss="mse")
+
+# 训练
+history = model_nn.fit(
+    X_train_scaled, y_train,
+    epochs=20, batch_size=256,
+    validation_data=(X_test_scaled, y_test),
+    verbose=1
+)
+
+# 预测
+y_pred_nn = model_nn.predict(X_test_scaled, verbose=0).flatten()
+
+# 指标
+mae_nn = mean_absolute_error(y_test, y_pred_nn)
+rmse_nn = np.sqrt(mean_squared_error(y_test, y_pred_nn))
+
+# 绘制 loss 曲线
+plt.figure(figsize=(10, 4))
+plt.plot(history.history["loss"], label="训练loss")
+plt.plot(history.history["val_loss"], label="测试loss")
+plt.title("神经网络 Loss 曲线")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
+plt.grid(alpha=0.3)
+plt.savefig(os.path.join(output_folder, "loss曲线_神经网络.png"), dpi=300, bbox_inches="tight")
+plt.close()
+
+# 模型2：随机森林（对比模型）
+model_rf = RandomForestRegressor(n_estimators=50, random_state=42)
+model_rf.fit(X_train, y_train)
+y_pred_rf = model_rf.predict(X_test)
+
+mae_rf = mean_absolute_error(y_test, y_pred_rf)
+rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
+
+#输出最终结果
+print("模型测试集对比结果")
+print(f"神经网络 → MAE: {mae_nn:.2f} | RMSE: {rmse_nn:.2f}")
+print(f"随机森林 → MAE: {mae_rf:.2f} | RMSE: {rmse_rf:.2f}")
+
+result_df = pd.DataFrame({
+    "模型": ["神经网络", "随机森林"],
+    "MAE": [mae_nn, mae_rf],
+    "RMSE": [rmse_nn, rmse_rf]
+})
+result_df.to_csv(os.path.join(output_folder, "模型对比结果.csv"), index=False, encoding="utf-8-sig")
+
+print("\n全部完成！")
+print("图表与结果已保存到：桌面 → outputs")
