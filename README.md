@@ -48,3 +48,59 @@ print("数据清洗完成")
 # 把毫秒时间戳转为标准日期（你最重要的一步！）
 df["pickup_time"] = pd.to_datetime(df["tpep_pickup_datetime"], unit="ms")
 df["dropoff_time"] = pd.to_datetime(df["tpep_dropoff_datetime"], unit="ms")
+
+# 5. 提取时间特征
+# 提取小时
+df["pick_hour"] = df["pickup_time"].dt.hour
+# 提取星期（0=周一，6=周日）
+df["weekday"] = df["pickup_time"].dt.weekday
+# 是否早晚高峰（7-9，17-19）
+df["is_peak"] = (df["pick_hour"].apply
+    (lambda h: 1 if (7 <= h <= 9) or (17 <= h <= 19) else 0))
+# 自创特征 1：行程时长分段（短/中/长）
+# 理由：不同时长的行程行为差异大，适合分析/建模
+if "trip_duration" in df.columns:
+    bins = [0, 10*60, 30*60, np.inf]
+    labels = ["短途", "中途", "长途"]
+    df["trip_type"] = pd.cut(df["trip_duration"], bins=bins, labels=labels)
+# 自创特征 2：是否周末
+# 理由：周末与工作日行程规律完全不同，是强特征
+df["is_weekend"] = df["weekday"].apply(lambda x: 1 if x >= 5 else 0)
+# 自创特征 3：时段分类（凌晨/上午/下午/晚上）
+# 理由：比单纯小时更有业务解释力
+def get_period(h):
+    if 5 <= h < 12:
+        return "上午"
+    elif 12 <= h < 17:
+        return "下午"
+    elif 17 <= h < 22:
+        return "晚上"
+    else:
+        return "凌晨"
+
+df["time_period"] = df["pick_hour"].apply(get_period)
+
+print("所有特征生成完成！")
+
+# 6. 输出最终结果
+print("最终处理后数据预览")
+print(df.head())
+
+#M2
+import matplotlib.pyplot as plt
+import os
+
+df["pick_hour"] = df["pickup_time"].dt.hour
+df["weekday"] = df["pickup_time"].dt.weekday
+df["is_weekend"] = df["weekday"].apply(lambda x: 1 if x >=5 else 0)
+df["trip_duration_sec"] = (df["dropoff_time"] - df["pickup_time"]).dt.total_seconds()
+df["is_peak"] = df["pick_hour"].apply(lambda h: 1 if (7<=h<=9) or (17<=h<=19) else 0)
+
+#桌面 outputs 文件夹
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+output_folder = os.path.join(desktop_path, "outputs")
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+plt.rcParams["font.sans-serif"] = ["SimHei"]
+plt.rcParams["axes.unicode_minus"] = False
