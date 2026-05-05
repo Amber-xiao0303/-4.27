@@ -104,3 +104,55 @@ if not os.path.exists(output_folder):
 
 plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
+
+#分析1：小时出行需求
+plt.figure(figsize=(12,5))
+hour_count = df.groupby("pick_hour").size()
+plt.plot(hour_count.index, hour_count.values, marker='o', color="#1f77b4")
+plt.title("每小时出行需求分布", fontsize=14)
+plt.xlabel("小时")
+plt.ylabel("订单数量")
+plt.xticks(range(0,24))
+plt.grid(alpha=0.3)
+plt.savefig(os.path.join(output_folder, "1_出行需求时间规律.png"), dpi=300, bbox_inches="tight")
+plt.close()
+
+#分析2：区域热度TOP10
+if "PULocationID" in df.columns:
+    top_loc = df["PULocationID"].value_counts().head(10)
+    plt.figure(figsize=(10,5))
+    top_loc.plot(kind="bar", color="#ff7f0e")
+    plt.title("上车热度 TOP10 区域")
+    plt.xlabel("区域ID")
+    plt.ylabel("订单量")
+    plt.xticks(rotation=0)
+    plt.savefig(os.path.join(output_folder, "2_区域热度TOP10.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+#分析3：车费与距离关系
+if "trip_distance" in df.columns and "fare_amount" in df.columns:
+    plt.figure(figsize=(10,6))
+    plt.scatter(df["trip_distance"], df["fare_amount"], alpha=0.1, color="#2ca02c")
+    plt.title("行程距离 vs 车费")
+    plt.xlabel("行程距离")
+    plt.ylabel("车费")
+    plt.grid(alpha=0.3)
+    plt.savefig(os.path.join(output_folder, "3_车费影响因素.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+# 分析4：不同时段 平均车费对比
+if "fare_amount" in df.columns:
+    period_fare = df.groupby("time_period")["fare_amount"].mean().sort_values(ascending=False)
+
+    plt.figure(figsize=(8, 5))
+    period_fare.plot(kind="bar", color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    plt.title("不同时段平均车费对比", fontsize=14)
+    plt.xlabel("时段")
+    plt.ylabel("平均车费（元）")
+    plt.xticks(rotation=0)
+    plt.grid(alpha=0.3)
+    plt.savefig(os.path.join(output_folder, "4_时段平均车费对比.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+print("图表已保存到：")
+print(output_folder)
